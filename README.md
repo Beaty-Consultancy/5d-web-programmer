@@ -36,9 +36,11 @@ job from any browser, on any OS, for free.
   **DCS** codes, TX power, tuning step, narrow FM, and scan-skip.
 - **24 scan banks** — group channels for bank scanning; a channel can live in several banks.
 - **Full-backup mode** — open the radio's `BACKUP.dat` full clone and the app unlocks
-  editable **bank names** and bank-link flags (more deep config to come). It auto-detects
-  whether you opened a `MEMORY.dat` (channels) or a `BACKUP.dat` (full clone) and writes
-  the correct file with the correct checksum.
+  editable **bank names** + bank-link, an **APRS** beacon config (callsign / SSID, beacon
+  on-off, interval, SmartBeaconing, digipath), a **Settings** tab for the radio menu
+  (auto-power-off, backlight, key-lock, squelch, TX time-out, battery save…), and **DTMF**
+  autodial memories. It auto-detects `MEMORY.dat` vs `BACKUP.dat`, edits only what you
+  change (everything else is preserved byte-for-byte), and writes the correct 4-byte checksum.
 - **Scan edges (PMS)** — edit the programmable-memory-scan range pairs (handy for scanning
   business / PMR / event band *ranges*, which the FT-5D sweeps via PMS rather than a bank).
 - **Private notes** — jot a reminder against any channel (stored in your browser only).
@@ -91,6 +93,12 @@ record, every value table, the scan-bank and PMS formats, and the checksum. The
 encoder in this tool is derived from and validated against that specification, so
 exported files are byte-identical to what the radio itself produces for the same
 settings.
+
+## Roadmap
+
+Full-backup (`BACKUP.dat`) editing now covers bank names + link, APRS beacon config,
+the common radio menu settings, and DTMF autodial. Possible next steps: more menu items,
+editable digipath callsigns, APRS position/symbol, and the WIRES-X / GM / DG-ID config.
 
 ## Compatibility
 

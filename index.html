@@ -82,6 +82,9 @@ input.name{width:130px;text-transform:uppercase}
 input.note{width:150px}
 input.off{width:62px;font-variant-numeric:tabular-nums;text-align:right}
 td.center{text-align:center}
+td.lbl{color:var(--muted);font-weight:500}
+input.dtmf{width:210px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:1px}
+.lk{display:inline-flex;align-items:center;gap:5px;cursor:pointer}
 .chip{display:inline-block;background:var(--line2);border-radius:20px;padding:2px 10px;
   font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums;font-weight:600}
 .rowbtn{border:none;background:none;color:var(--muted);cursor:pointer;padding:2px 6px;font-size:14px}
@@ -132,6 +135,9 @@ kbd{background:var(--panel2);border:1px solid var(--line);border-radius:5px;padd
   <button data-tab="channels" class="active" title="All memory channels and their settings">Channels</button>
   <button data-tab="banks" title="24 scan banks — group channels for bank scanning">Scan Banks</button>
   <button data-tab="pms" title="Programmable Memory Scan edges — frequency ranges to scan">Scan Edges (PMS)</button>
+  <button data-tab="aprs" class="deep" hidden title="APRS beacon configuration">APRS</button>
+  <button data-tab="settings" class="deep" hidden title="Radio menu settings">Settings</button>
+  <button data-tab="dtmf" class="deep" hidden title="DTMF autodial memories">DTMF</button>
 </div>
 <main id="main">
   <div class="empty" id="empty">
@@ -167,11 +173,13 @@ const RLEN=32, NBANK=24, BSLOT=100, NCHAN=900, NPMS=100, MAXFILE=0x30000;
 const FMT={
   44160 :{bank:0x0000,dir:0x12c0,rec:0x1800,pms:0x9500,cksum:0xab19,cklen:3,backup:false},
   130496:{bank:5440,dir:10240,rec:11584,pms:43584,cksum:130492,cklen:4,backup:true,
-          bankName:3828,bankLink:1340},
+          bankName:3828,bankLink:1340,setmode:1088,aprs:48832,dtmf:2368},
 };
-let BANK0,DIR0,REC0,PMS0,CKSUM,CKLEN,BANKNAME0,BANKLINK0,isBackup;
+let BANK0,DIR0,REC0,PMS0,CKSUM,CKLEN,BANKNAME0,BANKLINK0,SETMODE0,APRS0,DTMF0,isBackup;
+let deep=null;
 function setFormat(f){BANK0=f.bank;DIR0=f.dir;REC0=f.rec;PMS0=f.pms;CKSUM=f.cksum;
-  CKLEN=f.cklen;isBackup=f.backup;BANKNAME0=f.bankName;BANKLINK0=f.bankLink;}
+  CKLEN=f.cklen;isBackup=f.backup;BANKNAME0=f.bankName;BANKLINK0=f.bankLink;
+  SETMODE0=f.setmode;APRS0=f.aprs;DTMF0=f.dtmf;}
 
 let u8=null;                     // full file bytes (preserved except edited regions)
 let chans=[], pms=[], banks=[], bankNames=[], bankLinks=[];
@@ -234,6 +242,10 @@ function loadBuf(ab){
   if(isBackup){ for(let b=0;b<NBANK;b++){
     let nm='';for(let i=0;i<16;i++){const c=u8[BANKNAME0+b*18+2+i];if(c===0xff||c===0)break;if(c>=32&&c<127)nm+=String.fromCharCode(c);}
     bankNames.push(nm.trim()); bankLinks.push(((u8[BANKLINK0+(b>>3)]>>(b&7))&1)?true:false); } }
+  deep=null; if(isBackup)loadDeep();
+  document.querySelectorAll('.tabs .deep').forEach(b=>{b.hidden=!isBackup;});
+  if(!isBackup && (tab==='settings'||tab==='dtmf'||tab==='aprs')){tab='channels';
+    document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('active',x.dataset.tab==='channels'));}
   document.getElementById('empty').hidden=true;
   document.getElementById('view').hidden=false;
   document.getElementById('tabs').hidden=false;
@@ -267,6 +279,7 @@ function exportFile(){
       const lo=BANKLINK0+(b>>3), bit=1<<(b&7);               // link off if bank is empty
       out[lo]=(out[lo]&~bit)|((bankLinks[b]&&banks[b].size>0)?bit:0);
     }
+    if(deep)saveDeep(out);                                   // Settings, DTMF, APRS
   }
   let ck=0; for(let i=0;i<CKSUM;i++)ck=(ck+out[i])>>>0;      // 3-byte (MEMORY) or 4-byte (BACKUP) BE
   for(let k=0;k<CKLEN;k++)out[CKSUM+k]=(ck>>>(8*(CKLEN-1-k)))&0xff;
@@ -284,6 +297,77 @@ function noteKey(r){return 'bc5d:note:'+(r.name||'')+'|'+(r.rx||0).toFixed(4);}
 function getNote(r){try{return localStorage.getItem(noteKey(r))||'';}catch(e){return '';}}
 function setNote(r,v){try{v?localStorage.setItem(noteKey(r),v):localStorage.removeItem(noteKey(r));}catch(e){}}
 
+// ================= deep config (BACKUP.dat only): Settings, DTMF, APRS =================
+const _lvl=n=>Array.from({length:n},(_,i)=>'Level '+i);
+function apoOpt(){const a=['OFF'];for(let i=1;i<=24;i++){const t=i*30,h=(t/60|0),m=t%60;a.push(h?(h+'h'+(m||'')):(m+' min'));}return a;}
+function totOpt(){const a=['OFF'];for(let i=1;i<=20;i++){const s=i*30,m=(s/60|0),ss=s%60;a.push(m?(m+':'+String(ss).padStart(2,'0')):(s+' sec'));}return a;}
+const SETTINGS=[
+ {k:'apo',off:115,label:'Auto power off',opt:apoOpt()},
+ {k:'tot',off:154,label:'TX time-out timer',opt:totOpt()},
+ {k:'saverx',off:145,label:'Battery save (RX)',opt:['OFF','1:1','1:2','1:4','1:10','1:20','1:40','1:100','1:200','1:400']},
+ {k:'dimmer',off:132,label:'Backlight dimmer',opt:['Level 1','Level 2','Level 3','Level 4','Level 5','Level 6']},
+ {k:'lamp',off:138,label:'Backlight timer',opt:['Key 2s','Key 3s','Key 6s','Key 10s','Key 20s','Key 30s','Key 60s','Key 120s','Key 180s','Continuous','OFF']},
+ {k:'lock',off:139,label:'Key lock',opt:['KEY','DIAL','KEY + DIAL','PTT','KEY + PTT','DIAL + PTT','ALL']},
+ {k:'mic',off:141,label:'Mic gain',opt:['Level 1','Level 2','Level 3','Level 4','Level 5','Level 6','Level 7','Level 8','Level 9']},
+ {k:'beep',off:118,label:'Beep level',opt:['LOW','HIGH']},
+ {k:'sqlA',off:80,label:'Squelch level (A band)',opt:_lvl(16)},
+ {k:'sqlB',off:81,label:'Squelch level (B band)',opt:_lvl(16)},
+ {k:'vox',off:155,label:'VOX',opt:['OFF','LOW','HIGH']},
+];
+const APRS_INTERVAL=['30 sec','1 min','2 min','3 min','5 min','10 min','15 min','20 min','30 min','60 min'];
+const APRS_SMART=['OFF','Type 1','Type 2','Type 3'];
+const APRS_DIGI=['P1 (WIDE1-1)','P2 (WIDE1-1, WIDE2-1)','Path 3','Path 4','Path 5','Path 6','Path 7','Path 8'];
+const DTMF_T='0123456789ABCD*#-';
+const CS_OK=c=>c==='-'||c==='/'||(c>='0'&&c<='9')||(c>='A'&&c<='Z');
+function encCall(s){const a=new Uint8Array(6).fill(0xff);s=(s||'').toUpperCase();let j=0;for(const c of s){if(j>=6)break;if(CS_OK(c))a[j++]=c.charCodeAt(0);}return a;}
+function decFixed(o,len){let s='';for(let i=0;i<len;i++){const c=u8[o+i];if(c===0xff)break;if(c>=32&&c<127)s+=String.fromCharCode(c);}return s;}
+function encDtmf(s){const a=new Uint8Array(16).fill(0xff);s=(s||'').toUpperCase();let j=0;for(const c of s){if(j>=16)break;const x=DTMF_T.indexOf(c);if(x>=0)a[j++]=x;}return a;}
+function decDtmf(o){let s='';for(let i=0;i<16;i++){const b=u8[o+i];if(b===0xff||b>=DTMF_T.length)break;s+=DTMF_T[b];}return s;}
+function loadDeep(){
+  deep={settings:{},dtmf:[],aprs:{}};
+  SETTINGS.forEach(s=>deep.settings[s.k]=u8[SETMODE0+s.off]);
+  for(let m=0;m<10;m++)deep.dtmf.push(decDtmf(DTMF0+m*16));
+  const A=APRS0;
+  deep.aprs={call:decFixed(A+2,6),ssid:u8[A+8]&0x0f,beacon:(u8[A+11]>>6)&1,
+    interval:u8[A+28],smart:u8[A+300],digipath:u8[A+325]};
+}
+function saveDeep(out){
+  SETTINGS.forEach(s=>{const v=deep.settings[s.k];if(v!=null&&v<s.opt.length)out[SETMODE0+s.off]=v&0xff;});
+  for(let m=0;m<10;m++)out.set(encDtmf(deep.dtmf[m]),DTMF0+m*16);
+  const A=APRS0,ap=deep.aprs; out.set(encCall(ap.call),A+2);
+  out[A+8]=(out[A+8]&0xf0)|(ap.ssid&0x0f);
+  out[A+11]=(out[A+11]&~0x40)|(ap.beacon?0x40:0);
+  out[A+28]=ap.interval&0xff; out[A+300]=ap.smart&0xff; out[A+325]=ap.digipath&0xff;
+}
+function renderSettings(){
+  const rows=SETTINGS.map(s=>{const v=deep.settings[s.k];
+    return '<tr><td class="lbl">'+esc(s.label)+'</td><td><select class="sm" data-setk="'+s.k+'">'+opt(s.opt,v)+
+      (v>=s.opt.length?'<option value="'+v+'" selected>('+v+')</option>':'')+'</select></td></tr>';}).join('');
+  return '<div class="hint">Radio menu settings, saved into the backup. Only common ones are shown — the rest are preserved untouched.</div>'+
+    '<div class="tablewrap" style="max-width:520px"><table><thead><tr>'+th('Setting','Menu item')+th('Value','')+'</tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+function renderDtmf(){
+  const rows=deep.dtmf.map((s,i)=>'<tr><td class="idx">DTMF '+(i+1)+'</td>'+
+    '<td><input class="dtmf" data-dtmf="'+i+'" maxlength="16" value="'+esc(s)+'" placeholder="e.g. 1234*"></td></tr>').join('');
+  return '<div class="hint">DTMF autodial memories — up to 16 digits each (0-9, A-D, ✳, #). Stored in the backup.</div>'+
+    '<div class="tablewrap" style="max-width:420px"><table><thead><tr>'+th('#','')+th('Digits','')+'</tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+function renderAprs(){
+  const a=deep.aprs;
+  const ssidOpt=Array.from({length:16},(_,i)=>'<option value="'+i+'"'+(i===a.ssid?' selected':'')+'>'+(i?('-'+i):'(none)')+'</option>').join('');
+  const row=(l,ctl)=>'<tr><td class="lbl">'+l+'</td><td>'+ctl+'</td></tr>';
+  return '<div class="hint">APRS beacon configuration (saved into the backup). Set your callsign, then turn the beacon on and pick an interval or SmartBeaconing.</div>'+
+    '<div class="tablewrap" style="max-width:520px"><table><tbody>'+
+    row('My callsign','<input class="name" data-aprs="call" maxlength="6" value="'+esc(a.call)+'" placeholder="M7RHD">')+
+    row('SSID','<select class="sm" data-aprs="ssid">'+ssidOpt+'</select>')+
+    row('Beacon','<label class="lk"><input type="checkbox" data-aprs="beacon"'+(a.beacon?' checked':'')+'> transmit beacon</label>')+
+    row('Interval','<select class="sm" data-aprs="interval">'+opt(APRS_INTERVAL,a.interval)+'</select>')+
+    row('SmartBeaconing','<select class="sm" data-aprs="smart">'+opt(APRS_SMART,a.smart)+'</select>')+
+    row('Digipath','<select class="sm" data-aprs="digipath">'+opt(APRS_DIGI,a.digipath)+'</select>')+
+    '</tbody></table></div>'+
+    '<div class="hint" style="margin-top:10px">Callsign uses A-Z, 0-9, - and / only (max 6 chars, per Yaesu’s field). Only transmit where you are licensed.</div>';
+}
+
 // ---- rendering ----
 let tab='channels';
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -295,7 +379,9 @@ function th(label,tip){return '<th title="'+esc(tip)+'">'+esc(label)+'</th>';}
 
 function render(){
   const v=document.getElementById('view');
-  v.innerHTML = tab==='channels'?renderChannels() : tab==='banks'?renderBanks() : renderPms();
+  v.innerHTML = tab==='channels'?renderChannels() : tab==='banks'?renderBanks() :
+    tab==='pms'?renderPms() : tab==='settings'?renderSettings() :
+    tab==='dtmf'?renderDtmf() : tab==='aprs'?renderAprs() : renderChannels();
   wire();
 }
 function renderChannels(){
@@ -414,6 +500,15 @@ function wire(){
     bankNames[+el.dataset.bankname]=el.value.toUpperCase().slice(0,16);}));
   document.querySelectorAll('#view [data-banklink]').forEach(el=>el.addEventListener('change',()=>{
     bankLinks[+el.dataset.banklink]=el.checked;}));
+  document.querySelectorAll('#view [data-setk]').forEach(el=>el.addEventListener('change',()=>{
+    deep.settings[el.dataset.setk]=+el.value;}));
+  document.querySelectorAll('#view [data-dtmf]').forEach(el=>el.addEventListener('change',()=>{
+    deep.dtmf[+el.dataset.dtmf]=el.value.toUpperCase().replace(/[^0-9A-D*#-]/g,'').slice(0,16);}));
+  document.querySelectorAll('#view [data-aprs]').forEach(el=>el.addEventListener('change',()=>{
+    const f=el.dataset.aprs;
+    if(f==='call')deep.aprs.call=el.value.toUpperCase().replace(/[^0-9A-Z/-]/g,'').slice(0,6);
+    else if(f==='beacon')deep.aprs.beacon=el.checked?1:0;
+    else deep.aprs[f]=+el.value;}));
 }
 function blank(mhz,name){
   const a=new Uint8Array(32);
