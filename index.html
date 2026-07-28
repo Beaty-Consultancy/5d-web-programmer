@@ -41,6 +41,10 @@ header{display:flex;align-items:center;gap:14px;padding:13px 22px;background:var
 .logo .wm{font-weight:600;font-size:16px;color:var(--ink);letter-spacing:.1px;line-height:1.05}
 .logo .tool{font-size:11.5px;color:var(--muted);font-weight:500;letter-spacing:.2px}
 .spacer{flex:1}
+.pill{font-size:11px;font-weight:600;letter-spacing:.3px;padding:4px 11px;border-radius:20px;
+  border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.pill.backup{color:#fff;background:var(--bc-purple);border-color:var(--bc-purple)}
+:root[data-theme="dark"] .pill.backup{background:var(--bc-purple);border-color:var(--bc-purple)}
 button,.btn{background:var(--panel2);color:var(--ink);border:1px solid var(--line);
   border-radius:9px;padding:8px 14px;font-size:13px;cursor:pointer;font-weight:600;transition:.15s}
 button:hover{border-color:var(--accent);color:var(--accent-ink)}
@@ -101,6 +105,11 @@ td.center{text-align:center}
   border-top:1px solid var(--line);display:flex;gap:14px;flex-wrap:wrap;align-items:center}
 .foot a{color:var(--accent-ink)}
 kbd{background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:0 5px;font-size:11px}
+@media (max-width:640px){
+  header{padding:10px 14px;gap:10px} .logo .tool{display:none} main{padding:12px 12px 60px}
+  .tabs{padding:0 12px;overflow-x:auto} header button{padding:7px 11px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
@@ -112,10 +121,11 @@ kbd{background:var(--panel2);border:1px solid var(--line);border-radius:5px;padd
       <div class="tool">5D Web Programmer</div>
     </div>
   </a>
+  <span class="pill" id="modePill" hidden></span>
   <div class="spacer"></div>
   <button class="theme" id="themeBtn" title="Switch between the brand (light) and dark themes">◐ Theme</button>
-  <button id="loadBtn" title="Open a MEMORY.dat from your SD card (FT5D_MEMORY-CH/)">Open MEMORY.dat</button>
-  <button id="saveBtn" class="primary" disabled title="Write a radio-valid MEMORY.dat (checksum recomputed) to download">Export MEMORY.dat</button>
+  <button id="loadBtn" title="Open a MEMORY.dat or full BACKUP.dat from your SD card">Open file…</button>
+  <button id="saveBtn" class="primary" disabled title="Write a radio-valid file (checksum recomputed) to download">Export</button>
   <input type="file" id="file" accept=".dat" hidden>
 </header>
 <div class="tabs" id="tabs" hidden>
@@ -228,9 +238,13 @@ function loadBuf(ab){
   document.getElementById('view').hidden=false;
   document.getElementById('tabs').hidden=false;
   document.getElementById('foot').hidden=false;
-  document.getElementById('saveBtn').disabled=false;
+  const sv=document.getElementById('saveBtn'); sv.disabled=false;
+  sv.textContent='Export '+(isBackup?'BACKUP.dat':'MEMORY.dat');
+  const pill=document.getElementById('modePill'); pill.hidden=false;
+  pill.className='pill'+(isBackup?' backup':'');
+  pill.textContent=isBackup?'BACKUP.dat · full radio clone':'MEMORY.dat · channels';
   render();
-  toast('Loaded '+chans.length+' channels · '+pms.length+' scan-edge records');
+  toast('Loaded '+chans.length+' channels · '+pms.length+' scan-edge records'+(isBackup?' · 24 named banks':''));
 }
 
 // ---- export ----

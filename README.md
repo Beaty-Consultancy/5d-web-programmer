@@ -14,6 +14,8 @@ _by [Beaty Consultancy](https://beatyconsultancy.co.uk) — friendly, affordable
 
 </div>
 
+![The channel editor](docs/screenshot-channels.png)
+
 ---
 
 ## What it is
@@ -33,8 +35,15 @@ job from any browser, on any OS, for free.
   shift including **odd/non-standard splits**, CTCSS **tone**, **tone-squelch (TSQL)**,
   **DCS** codes, TX power, tuning step, narrow FM, and scan-skip.
 - **24 scan banks** — group channels for bank scanning; a channel can live in several banks.
-- **Scan edges (PMS)** — edit the programmable-memory-scan range pairs.
+- **Full-backup mode** — open the radio's `BACKUP.dat` full clone and the app unlocks
+  editable **bank names** and bank-link flags (more deep config to come). It auto-detects
+  whether you opened a `MEMORY.dat` (channels) or a `BACKUP.dat` (full clone) and writes
+  the correct file with the correct checksum.
+- **Scan edges (PMS)** — edit the programmable-memory-scan range pairs (handy for scanning
+  business / PMR / event band *ranges*, which the FT-5D sweeps via PMS rather than a bank).
 - **Private notes** — jot a reminder against any channel (stored in your browser only).
+
+![Editing bank names in full-backup mode](docs/screenshot-banks.png)
 - **Safe by construction** — the decoder/encoder is validated **byte-for-byte** against
   Yaesu ADMS-14's own output, and the checksum is recomputed on export.
 - **Zero dependencies, one file** — `index.html` is entirely self-contained.
