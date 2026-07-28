@@ -108,3 +108,31 @@ on FM signals within the range.
 
 3 bytes, big-endian, equal to `sum(file[0 : 0xAB19]) & 0xFFFFFF`. Recompute and
 write these three bytes after any edit or the radio will reject the file.
+
+## `BACKUP.dat` — the full clone
+
+The SD "Backup" function writes a second file, `FT5D/BACKUP/BACKUP.dat`
+(**130,496 bytes**, `0x1FDC0`), which is a full image of the radio. Restoring it
+replaces the whole configuration, so preserve every byte you don't intend to change.
+
+`MEMORY.dat` is a window of this image offset by `−5440`, so the memory-channel
+regions above appear here at their native addresses (add 5440): bank membership at
+`0x1540`, directory at `0x2800`, channels at `0x2D40`, skip at `0x9DC0`, PMS at
+`0xAA40`. The record and value-table formats are identical.
+
+Additional regions (byte offsets are direct in this file):
+
+| Offset | Contents |
+|--------|----------|
+| `0x0440` (1088) | Set-mode (radio menu) — mostly one byte per setting; bank-link bitfield at `+252` (3 bytes) |
+| `0x0940` (2368) | DTMF autodial — 10 memories × 16 digit bytes |
+| `0x0EF4` (3828) | Bank names — 24 × 18-byte slots (u16 width BE + 16-byte name) |
+| `0xBEC0` (48832) | APRS config — callsign `+2` (6 B) + SSID `+8`, beacon flag `+11` bit6, interval `+28`, digipath `+325`, SmartBeaconing `+300` |
+
+**Character encodings.** Channel/bank names and APRS text are ASCII (`0x20–0x7E`),
+`0xFF`-padded. APRS/GM callsigns use ASCII restricted to `A–Z 0–9 - /`. DTMF uses a
+compact index table: `0–9`→0–9, `A–D`→10–13, `*`→14, `#`→15, `-`→16, empty `0xFF`.
+
+**Checksum.** Different from `MEMORY.dat`: a **4-byte big-endian** value at offset
+`130492` (`0x1FDBC`) equal to `sum(file[0 : 130492])` (the whole file except its last
+four bytes). Recompute after any edit.
