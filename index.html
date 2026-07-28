@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Free, open-source, in-browser codeplug editor for the Yaesu FT-5DE / FT-5D. Reads and writes the SD-card MEMORY.dat directly — no Yaesu software, nothing leaves your device.">
+<title>5D Web Programmer · Beaty Consultancy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ---- Beaty Consultancy brand palette (from brand guidelines) ---- */
+:root{
+  --bc-cyan:#06b3d7; --bc-indigo:#2e3889; --bc-purple:#653089; --bc-pink:#e6257a; --bc-grey:#585856;
+  --grad:linear-gradient(135deg,#06b3d7 0%,#2e3889 45%,#653089 75%,#e6257a 100%);
+  --grad-blue:linear-gradient(135deg,#2e3889,#06b3d7);
+  /* light (default / brand) */
+  --bg:#fafcfd; --panel:#ffffff; --panel2:#f4f7fa; --line:#e3eaf1; --line2:#eef3f8;
+  --ink:#1d2238; --head:#2e3889; --muted:#585856; --accent:#06b3d7; --accent-ink:#0a5f74;
+  --shadow:0 1px 2px #2e388910,0 6px 22px #2e388912;
+  --grid:#2e388909; --good:#128a4b; --warn:#b5730a; --bad:#d1275a;
+}
+:root[data-theme="dark"]{
+  --bg:#141a2e; --panel:#1d2238; --panel2:#242c48; --line:#333b5c; --line2:#2b3350;
+  --ink:#e9edf7; --head:#8fb7ff; --muted:#98a3c4; --accent:#22c3e6; --accent-ink:#bfeefb;
+  --shadow:0 1px 2px #0006,0 8px 30px #0005; --grid:#ffffff08; --good:#3fb96b; --warn:#e0a53a; --bad:#ff5d86;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--bg);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:26px 26px;
+  color:var(--ink);
+  font:14px/1.5 'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+}
+h1,h2,.brandfont,button,th{font-family:'Quicksand','Inter',system-ui,sans-serif}
+.topgrad{height:4px;background:var(--grad)}
+header{display:flex;align-items:center;gap:16px;padding:12px 20px;background:var(--panel);
+  border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20;flex-wrap:wrap;box-shadow:var(--shadow)}
+.logo{display:flex;align-items:center;gap:11px;text-decoration:none;color:inherit}
+.logo svg{width:38px;height:30px;flex:none}
+.logo .wm{font-weight:700;font-size:16px;color:var(--head);letter-spacing:.2px;line-height:1}
+.logo .tool{font-size:11.5px;color:var(--muted);font-weight:500;letter-spacing:.3px}
+.spacer{flex:1}
+button,.btn{background:var(--panel2);color:var(--ink);border:1px solid var(--line);
+  border-radius:9px;padding:8px 14px;font-size:13px;cursor:pointer;font-weight:600;transition:.15s}
+button:hover{border-color:var(--accent);color:var(--accent-ink)}
+button.primary{background:var(--grad-blue);border:none;color:#fff}
+button.primary:hover{filter:brightness(1.08);color:#fff}
+button:disabled{opacity:.45;cursor:not-allowed;filter:none}
+.tabs{display:flex;gap:2px;padding:0 20px;background:var(--panel);border-bottom:1px solid var(--line)}
+.tabs button{border:none;border-radius:0;border-bottom:2.5px solid transparent;background:none;
+  padding:12px 15px;color:var(--muted);font-weight:600}
+.tabs button:hover{color:var(--ink)}
+.tabs button.active{color:var(--head);border-bottom-color:var(--bc-cyan)}
+main{padding:18px 20px 70px;max-width:1500px;margin:0 auto}
+.hint{color:var(--muted);font-size:12.5px;margin:0 0 14px}
+.hint b{color:var(--ink)}
+.empty{max-width:600px;margin:9vh auto;text-align:center}
+.empty h2{color:var(--head);font-weight:700;font-size:26px;margin:.2em 0}
+.empty p{color:var(--muted)}
+.drop{border:2px dashed var(--line);border-radius:16px;padding:42px;margin-top:20px;cursor:pointer;
+  background:var(--panel);transition:.15s;font-weight:600;color:var(--muted)}
+.drop:hover,.drop.over{border-color:var(--bc-cyan);color:var(--accent-ink);box-shadow:var(--shadow)}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--panel);box-shadow:var(--shadow)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:6px 9px;border-bottom:1px solid var(--line2);text-align:left;white-space:nowrap}
+th{position:sticky;top:0;background:var(--panel2);color:var(--muted);font-weight:600;
+  font-size:11px;text-transform:uppercase;letter-spacing:.5px;z-index:2;cursor:help}
+tr:hover td{background:var(--panel2)}
+td .idx{color:var(--muted);font-variant-numeric:tabular-nums}
+input,select{background:var(--bg);color:var(--ink);border:1px solid var(--line);
+  border-radius:6px;padding:4px 6px;font:inherit;font-size:12.5px}
+input:focus,select:focus{outline:2px solid var(--bc-cyan);outline-offset:-1px;border-color:var(--bc-cyan)}
+input.freq{width:84px;font-variant-numeric:tabular-nums;text-align:right}
+input.name{width:130px;text-transform:uppercase}
+input.note{width:150px}
+input.off{width:62px;font-variant-numeric:tabular-nums;text-align:right}
+td.center{text-align:center}
+.chip{display:inline-block;background:var(--line2);border-radius:20px;padding:2px 10px;
+  font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums;font-weight:600}
+.rowbtn{border:none;background:none;color:var(--muted);cursor:pointer;padding:2px 6px;font-size:14px}
+.rowbtn:hover{color:var(--bad)}
+.bankgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.bankcard{border:1px solid var(--line);border-radius:11px;padding:12px 14px;background:var(--panel);box-shadow:var(--shadow)}
+.bankcard h3{margin:0 0 8px;font-size:14px;color:var(--head);display:flex;justify-content:space-between;align-items:center}
+.bankcard label{display:flex;gap:8px;align-items:center;padding:2px 0;cursor:pointer;font-size:12.5px}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--panel);
+  border:1px solid var(--line);border-radius:11px;padding:11px 20px;box-shadow:0 10px 34px #2e388930;
+  opacity:0;transition:.25s;pointer-events:none;z-index:50;font-weight:500}
+.toast.show{opacity:1}
+.summary{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:stretch}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:9px 14px;box-shadow:var(--shadow)}
+.stat b{font-size:19px;font-variant-numeric:tabular-nums;color:var(--head);font-family:'Quicksand',sans-serif}
+.stat span{display:block;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+.stat.act{display:flex;align-items:center}
+.foot{max-width:1500px;margin:26px auto 0;padding:16px 20px;color:var(--muted);font-size:12px;
+  border-top:1px solid var(--line);display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+.foot a{color:var(--accent-ink)}
+kbd{background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:0 5px;font-size:11px}
+</style>
+</head>
+<body>
+<div class="topgrad"></div>
+<header>
+  <a class="logo" href="https://beatyconsultancy.co.uk" target="_blank" rel="noopener" title="Beaty Consultancy">
+    <svg viewBox="0 0 64 50" aria-hidden="true">
+      <defs><linearGradient id="bc" x1="0" y1="1" x2="1" y2="0">
+        <stop offset="0" stop-color="#2e3889"/><stop offset="1" stop-color="#06b3d7"/></linearGradient></defs>
+      <g fill="none" stroke="url(#bc)" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M17 40 a11 11 0 0 1 -1.6 -21.9 a15 15 0 0 1 28.4 -2.6 a9.5 9.5 0 0 1 3.3 18.6"/>
+        <path d="M24 24.5 a9 9 0 0 1 15.5 -1.2"/><path d="M39.5 16.5 l0.9 6.9 l-6.9 -1"/>
+        <path d="M40 33.5 a9 9 0 0 1 -15.5 1.2"/><path d="M24.5 41.5 l-0.9 -6.9 l6.9 1"/>
+      </g>
+    </svg>
+    <div>
+      <div class="wm">Beaty Consultancy</div>
+      <div class="tool">5D Web Programmer</div>
+    </div>
+  </a>
+  <div class="spacer"></div>
+  <button class="theme" id="themeBtn" title="Switch between the brand (light) and dark themes">◐ Theme</button>
+  <button id="loadBtn" title="Open a MEMORY.dat from your SD card (FT5D_MEMORY-CH/)">Open MEMORY.dat</button>
+  <button id="saveBtn" class="primary" disabled title="Write a radio-valid MEMORY.dat (checksum recomputed) to download">Export MEMORY.dat</button>
+  <input type="file" id="file" accept=".dat" hidden>
+</header>
+<div class="tabs" id="tabs" hidden>
+  <button data-tab="channels" class="active" title="All memory channels and their settings">Channels</button>
+  <button data-tab="banks" title="24 scan banks — group channels for bank scanning">Scan Banks</button>
+  <button data-tab="pms" title="Programmable Memory Scan edges — frequency ranges to scan">Scan Edges (PMS)</button>
+</div>
+<main id="main">
+  <div class="empty" id="empty">
+    <h2>Program your FT-5D in the browser</h2>
+    <p>Open the <code>MEMORY.dat</code> from your SD card (<code>FT5D_MEMORY-CH/MEMORY.dat</code>).
+    Everything is decoded, edited and written <b>locally in your browser</b> — no upload, no server,
+    no Yaesu software. Export produces a radio-valid file (checksum recomputed); copy it back to the card,
+    then on the radio: <em>MENU → SD CARD → 2 MEMORY CH → Read from SD</em>.</p>
+    <div class="drop" id="drop">Click to choose a MEMORY.dat, or drop it here</div>
+  </div>
+  <div id="view" hidden></div>
+</main>
+<div class="foot" id="foot" hidden>
+  <span>Built by <a href="https://beatyconsultancy.co.uk" target="_blank" rel="noopener">Beaty Consultancy</a> · open-source (MIT)</span>
+  <span>Decoder validated byte-for-byte against Yaesu ADMS-14. Use at your own risk — always keep a backup of your card.</span>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+// ================= ADMS-validated tables (ports of the reference engine) =================
+const TONES=[67.0,69.3,71.9,74.4,77.0,79.7,82.5,85.4,88.5,91.5,94.8,97.4,100.0,103.5,107.2,110.9,114.8,118.8,123.0,127.3,131.8,136.5,141.3,146.2,151.4,156.7,159.8,162.2,165.5,167.9,171.3,173.8,177.3,179.9,183.5,186.2,189.9,192.8,196.6,199.5,203.5,206.5,210.7,218.1,225.7,229.1,233.6,241.8,250.3,254.1];
+const DCS=["023","025","026","031","032","036","043","047","051","053","054","065","071","072","073","074","114","115","116","122","125","131","132","134","143","145","152","155","156","162","165","172","174","205","212","223","225","226","243","244","245","246","251","252","255","261","263","265","266","271","274","306","311","315","325","331","332","343","346","351","356","364","365","371","411","412","413","423","431","432","445","446","452","454","455","462","464","465","466","503","506","516","523","526","532","546","565","606","612","624","627","631","632","654","662","664","703","712","723","731","732","734","743","754"];
+const STEP=["5.0","6.25","8.33","10.0","12.5","15.0","20.0","25.0","50.0","100.0","9.0"]; // kHz; byte1 low-nibble index
+const SQL=["OFF","TONE","TSQL","DCS","REV TONE","JR","PR","PAGER","--","D CD","TONE-DCS","D CD-TONE"];
+const MODEB=["FM","AM","WFM","-"];      // byte1 bits6-7 analog modulation
+const DIGA=["Analog","AMS","DN","VW"];  // byte5 bits4-5
+const POWER=["L1 .3W","L2 1W","L3 2.5W","High 5W"];
+// region offsets in MEMORY.dat (SD_offset = ADMS_addr - 5440)
+const BANK0=0x0000, DIR0=0x12c0, REC0=0x1800, PMS0=0x9500, CKSUM=0xab19, RLEN=32;
+const NBANK=24, BSLOT=100, NCHAN=900, NPMS=100, MAXFILE=0x30000;
+
+let u8=null;                     // full file bytes (preserved except edited regions)
+let chans=[], pms=[], banks=[];  // banks[b] = Set of 0-based channel indices
+
+// ---- byte helpers ----
+const clampF=(x,fb)=>{const n=parseFloat(x);return Number.isFinite(n)?n:fb;};
+const bcd=o=>{let s='';for(let i=0;i<3;i++)s+=u8[o+i].toString(16).padStart(2,'0');const n=parseInt(s,10);return Number.isNaN(n)?0:n/1000;};
+function bcdTo(a,o,mhz){let v=Math.round(Math.max(0,Math.min(999.999,mhz||0))*1000);
+  const s=String(v).padStart(6,'0');a[o]=parseInt(s.slice(0,2),16);a[o+1]=parseInt(s.slice(2,4),16);a[o+2]=parseInt(s.slice(4,6),16);}
+const magtype=m=> m<2?4:(m>=108&&m<137)?1:(m>=137&&m<300)?2:m>=300?3:7;
+const clampInt=(v,lo,hi,fb)=>{v=parseInt(v,10);return (Number.isInteger(v)&&v>=lo&&v<=hi)?v:fb;};
+
+function decodeRec(o){
+  const r={raw:u8.slice(o,o+RLEN)};
+  r.narrow=(u8[o]>>5)&1;
+  r.step=u8[o+1]&0xf; r.shiftdir=(u8[o+1]>>4)&3; r.mode=(u8[o+1]>>6)&3;
+  r.rx=bcd(o+2);
+  r.sql=u8[o+5]&0xf; r.dig=(u8[o+5]>>4)&3; r.power=(u8[o+5]>>6)&3;
+  let nm='';for(let i=8;i<24;i++){const c=u8[o+i];if(c===0xff||c===0)break;if(c>=32&&c<127)nm+=String.fromCharCode(c);}
+  r.name=nm;
+  const shf=bcd(o+24);
+  r.tx = r.shiftdir===0?r.rx : r.shiftdir===1?r.rx-shf : r.shiftdir===2?r.rx+shf : shf;
+  r.offset = r.shiftdir===3 ? +(r.tx-r.rx).toFixed(4) : +(shf*(r.shiftdir===1?-1:1)).toFixed(4);
+  r.tone=u8[o+27]; r.dcs=u8[o+28]; r.dcsdim=(u8[o+29]>>5)&7;
+  return r;
+}
+// re-pack raw bytes from (possibly edited) fields, preserving bytes we do not expose
+function reencode(r){
+  const a=r.raw;
+  a[0]=(a[0]&0xC0)|magtype(r.rx)|(r.narrow?0x20:0);
+  a[1]=((r.step&0xf))|((r.shiftdir&3)<<4)|((r.mode&3)<<6);
+  bcdTo(a,2,r.rx);
+  a[5]=(r.sql&0xf)|((r.dig&3)<<4)|((r.power&3)<<6);
+  const nm=(r.name||'').slice(0,16);
+  for(let i=0;i<16;i++){const c=nm.charCodeAt(i);a[8+i]=(i<nm.length&&c>=32&&c<127)?c:0xff;}
+  if(r.shiftdir===3) bcdTo(a,24,(r.rx||0)+(r.offset||0));
+  else if(r.shiftdir===1||r.shiftdir===2) bcdTo(a,24,Math.abs(r.offset||0));
+  // shiftdir 0 (simplex): leave bytes 24-26 as-is (radio parks a default there; unused on TX)
+  a[27]=clampInt(r.tone,0,49,12); a[28]=clampInt(r.dcs,0,DCS.length-1,0);
+  a[29]=(a[29]&0x1f)|((r.dcsdim&7)<<5);
+  a[30]=(a[30]&0x3f)|((r.dig===1?0x80:0)|(r.dig===3?0x40:0)); // bit7=AMS, bit6=VW
+  return r;
+}
+
+function loadBuf(ab){
+  if(ab.byteLength<CKSUM+3){toast('That does not look like an FT-5D MEMORY.dat');return;}
+  if(ab.byteLength>MAXFILE){toast('File too large to be a MEMORY.dat');return;}
+  u8=new Uint8Array(ab);
+  chans=[]; const slotToIdx=Object.create(null);
+  for(let i=0;i<NCHAN;i++){ if(u8[DIR0+i]&1){ const r=decodeRec(REC0+i*RLEN);
+    r.skip=((u8[DIR0+i]>>2)&3)?true:false; r.note=getNote(r); slotToIdx[i]=chans.length; chans.push(r);} }
+  pms=[]; for(let i=0;i<NPMS;i++){ const o=PMS0+i*RLEN; if(u8[o]===0xff&&u8[o+1]===0xff)continue;
+    pms.push(decodeRec(o)); }
+  // bank membership is stored by ABSOLUTE slot; translate to our compacted list so gappy files stay correct
+  banks=[]; for(let b=0;b<NBANK;b++){ const s=new Set(); const base=BANK0+b*BSLOT*2;
+    for(let k=0;k<BSLOT;k++){ const v=(u8[base+k*2]<<8)|u8[base+k*2+1]; if(v===0xffff)continue;
+      const idx=v&0x7ff; if((v>>11)===0 && idx in slotToIdx) s.add(slotToIdx[idx]); } banks.push(s); }
+  document.getElementById('empty').hidden=true;
+  document.getElementById('view').hidden=false;
+  document.getElementById('tabs').hidden=false;
+  document.getElementById('foot').hidden=false;
+  document.getElementById('saveBtn').disabled=false;
+  render();
+  toast('Loaded '+chans.length+' channels · '+pms.length+' scan-edge records');
+}
+
+// ---- export ----
+function exportFile(){
+  const out=new Uint8Array(u8);                    // start from the loaded file (preserve everything)
+  for(let i=0;i<NCHAN;i++){out[DIR0+i]=0;for(let j=0;j<RLEN;j++)out[REC0+i*RLEN+j]=0xff;}
+  chans.slice(0,NCHAN).forEach((r,i)=>{ reencode(r); out.set(r.raw,REC0+i*RLEN);
+    out[DIR0+i]=0x03|((r.skip?1:0)<<2); if(r.note!=null)setNote(r,r.note); });
+  for(let i=0;i<NPMS;i++)for(let j=0;j<RLEN;j++)out[PMS0+i*RLEN+j]=0xff;
+  pms.slice(0,NPMS).forEach((r,i)=>{reencode(r);out.set(r.raw,PMS0+i*RLEN);});
+  for(let b=0;b<NBANK;b++){const base=BANK0+b*BSLOT*2;
+    for(let k=0;k<BSLOT*2;k++)out[base+k]=0xff;
+    let k=0; banks[b].forEach(ci=>{ if(k<BSLOT && ci>=0 && ci<chans.length){ const v=(ci&0x7ff);
+      out[base+k*2]=(v>>8)&0xff; out[base+k*2+1]=v&0xff; k++; } }); }
+  let ck=0; for(let i=0;i<CKSUM;i++)ck=(ck+out[i])&0xffffff;
+  out[CKSUM]=(ck>>16)&0xff; out[CKSUM+1]=(ck>>8)&0xff; out[CKSUM+2]=ck&0xff;
+  const blob=new Blob([out],{type:'application/octet-stream'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='MEMORY.dat'; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1500);
+  toast('Exported MEMORY.dat — copy to FT5D_MEMORY-CH/ on the card');
+}
+
+// ---- app-only per-channel notes (localStorage; NOT written to the radio) ----
+function noteKey(r){return 'bc5d:note:'+(r.name||'')+'|'+(r.rx||0).toFixed(4);}
+function getNote(r){try{return localStorage.getItem(noteKey(r))||'';}catch(e){return '';}}
+function setNote(r,v){try{v?localStorage.setItem(noteKey(r),v):localStorage.removeItem(noteKey(r));}catch(e){}}
+
+// ---- rendering ----
+let tab='channels';
+const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function opt(list,sel){return list.map((x,i)=>'<option value="'+i+'"'+(i===sel?' selected':'')+'>'+esc(x)+'</option>').join('');}
+function toneOpts(sel){return '<option value="255"'+(sel>=50?' selected':'')+'>–</option>'+
+  TONES.map((t,i)=>'<option value="'+i+'"'+(i===sel?' selected':'')+'>'+t.toFixed(1)+'</option>').join('');}
+function dcsOpts(sel){return DCS.map((d,i)=>'<option value="'+i+'"'+(i===sel?' selected':'')+'>'+d+'</option>').join('');}
+function th(label,tip){return '<th title="'+esc(tip)+'">'+esc(label)+'</th>';}
+
+function render(){
+  const v=document.getElementById('view');
+  v.innerHTML = tab==='channels'?renderChannels() : tab==='banks'?renderBanks() : renderPms();
+  wire();
+}
+function renderChannels(){
+  const rows=chans.map((r,i)=>'<tr data-i="'+i+'">'+
+    '<td class="idx">'+(i+1)+'</td>'+
+    '<td><input class="freq" data-f="rx" value="'+esc(r.rx.toFixed(4))+'"></td>'+
+    '<td><input class="name" data-f="name" maxlength="16" value="'+esc(r.name)+'"></td>'+
+    '<td><select class="sm" data-f="dig">'+opt(DIGA,r.dig)+'</select></td>'+
+    '<td><select class="sm" data-f="mode">'+opt(MODEB,r.mode)+'</select></td>'+
+    '<td><select class="sm" data-f="shiftdir">'+opt(["Simplex","−","+","Split"],r.shiftdir)+'</select></td>'+
+    '<td><input class="off" data-f="offset" value="'+esc(String(r.offset))+'"></td>'+
+    '<td><select class="sm" data-f="sql">'+opt(SQL,r.sql)+'</select></td>'+
+    '<td><select class="sm" data-f="tone">'+toneOpts(r.tone)+'</select></td>'+
+    '<td><select class="sm" data-f="dcs">'+dcsOpts(r.dcs)+'</select></td>'+
+    '<td><select class="sm" data-f="power">'+opt(POWER,r.power)+'</select></td>'+
+    '<td><select class="sm" data-f="step">'+opt(STEP,r.step)+'</select></td>'+
+    '<td class="center"><input type="checkbox" data-f="narrow"'+(r.narrow?' checked':'')+'></td>'+
+    '<td class="center"><input type="checkbox" data-f="skip"'+(r.skip?' checked':'')+'></td>'+
+    '<td><input class="note" data-f="note" placeholder="e.g. Keswick" value="'+esc(r.note||'')+'"></td>'+
+    '<td class="center"><button class="rowbtn" data-del="'+i+'" title="Delete this channel">✕</button></td></tr>').join('');
+  return '<div class="summary">'+
+    '<div class="stat"><b>'+chans.length+'</b><span>channels</span></div>'+
+    '<div class="stat"><b>'+chans.filter(c=>c.sql===1||c.sql===2).length+'</b><span>with tone</span></div>'+
+    '<div class="stat"><b>'+chans.filter(c=>c.shiftdir).length+'</b><span>with shift</span></div>'+
+    '<div class="stat"><b>'+chans.filter(c=>c.dig>=2).length+'</b><span>digital</span></div>'+
+    '<div class="stat act"><button id="addCh">+ Add channel</button></div></div>'+
+   '<div class="hint">Edit any cell — changes stay in memory until you <b>Export</b>. <b>Note</b> is stored in this browser only and is <b>not</b> written to the radio (the radio shows the <b>Name</b>, up to 16 chars — e.g. “GB3CA KESWICK”). Hover any column heading for help.</div>'+
+   '<div class="tablewrap"><table><thead><tr>'+
+     th('#','Memory channel number')+
+     th('RX MHz','Receive frequency in MHz')+
+     th('Name','Alpha tag shown on the radio (max 16 characters)')+
+     th('Mode','Analog · AMS (auto analog/C4FM) · DN (C4FM digital narrow) · VW (C4FM voice wide)')+
+     th('Mod','Analog modulation used when Mode = Analog: FM / AM / WFM')+
+     th('Shift','Repeater shift: Simplex · − (minus) · + (plus) · Split (independent TX)')+
+     th('Offset','Shift amount in MHz (e.g. 0.6 for 2m, 1.6 for 70cm). For Split, TX = RX + this.')+
+     th('Squelch','Tone/DCS squelch: TONE transmits CTCSS to open a repeater; TSQL also mutes RX; DCS uses a digital code')+
+     th('Tone','CTCSS tone (Hz) used by TONE / TSQL')+
+     th('DCS','DCS code used when Squelch = DCS')+
+     th('Power','TX power: L1 0.3W · L2 1W · L3 2.5W · High 5W')+
+     th('Step kHz','Tuning step for this channel')+
+     th('N','Narrow — narrowband FM (±2.5kHz / half-deviation) for 12.5kHz business/PMR channels')+
+     th('Skip','Skip this channel during normal memory scan')+
+     th('Note','Your private reminder (app-only, not on the radio)')+
+     '<th></th>'+
+   '</tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+function renderPms(){
+  const rows=pms.map((r,i)=>'<tr data-i="'+i+'" data-pms="1">'+
+    '<td class="idx">'+((i%2)?'HI':'LO')+' '+(Math.floor(i/2)+1)+'</td>'+
+    '<td><input class="freq" data-f="rx" value="'+esc(r.rx.toFixed(4))+'"></td>'+
+    '<td><input class="name" data-f="name" maxlength="16" value="'+esc(r.name)+'"></td>'+
+    '<td><select class="sm" data-f="dig">'+opt(DIGA,r.dig)+'</select></td>'+
+    '<td><select class="sm" data-f="mode">'+opt(MODEB,r.mode)+'</select></td>'+
+    '<td><select class="sm" data-f="step">'+opt(STEP,r.step)+'</select></td>'+
+    '<td class="center"><input type="checkbox" data-f="narrow"'+(r.narrow?' checked':'')+'></td>'+
+    '<td class="center"><button class="rowbtn" data-del="'+i+'" title="Delete this edge">✕</button></td></tr>').join('');
+  return '<div class="hint">Programmable Memory Scan edges — each <b>LO/HI</b> pair bounds a frequency range the radio sweeps. '+
+    'Set the <b>Mode</b> to <b>Analog</b> or <b>AMS</b> (not DN) so it stops on FM signals; PMR446 is analog FM, narrow.</div>'+
+   '<div class="summary"><div class="stat act"><button id="addPms">+ Add edge pair</button></div>'+
+     '<div class="stat"><b>'+Math.floor(pms.length/2)+'</b><span>edge pairs</span></div></div>'+
+   '<div class="tablewrap"><table><thead><tr>'+
+     th('Edge','LO = lower bound, HI = upper bound of the scan range')+
+     th('MHz','Edge frequency')+ th('Name','Label for this edge')+
+     th('Mode','Receive mode while sweeping — Analog or AMS recommended')+
+     th('Mod','Analog modulation (FM/AM) when Mode = Analog')+
+     th('Step','Tuning step while scanning the range')+
+     th('N','Narrowband FM (for PMR / business)')+ '<th></th>'+
+   '</tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+function renderBanks(){
+  const cards=banks.map((s,b)=>'<div class="bankcard">'+
+    '<h3><span>Bank '+(b+1)+'</span><span class="chip">'+s.size+'</span></h3>'+
+    '<div style="max-height:210px;overflow:auto">'+
+    chans.map((c,i)=>'<label title="'+esc(c.rx.toFixed(4)+' MHz')+'"><input type="checkbox" data-bank="'+b+'" data-ch="'+i+'"'+(s.has(i)?' checked':'')+'>'+
+      '<span class="idx">'+(i+1)+'</span> '+esc(c.name||'(unnamed)')+' <span class="chip">'+esc(c.rx.toFixed(3))+'</span></label>').join('')+
+    '</div></div>').join('');
+  return '<div class="hint">24 scan banks. A channel can belong to <b>several</b> banks — tick it wherever you want it. '+
+    'On the radio, select a bank to scan only those channels. <b>Bank names</b> live in the radio’s full backup (not MEMORY.dat), so here banks are numbered.</div>'+
+    '<div class="bankgrid">'+cards+'</div>';
+}
+
+function wire(){
+  document.querySelectorAll('#view [data-f]').forEach(el=>{
+    el.addEventListener('change',()=>{
+      const tr=el.closest('tr'); const arr=tr.dataset.pms?pms:chans; const r=arr[+tr.dataset.i]; if(!r)return;
+      const f=el.dataset.f;
+      if(f==='name')r.name=el.value.toUpperCase().slice(0,16);
+      else if(f==='note')r.note=el.value.slice(0,120);
+      else if(f==='rx')r.rx=Math.max(0,Math.min(999.999,clampF(el.value,r.rx)));
+      else if(f==='offset')r.offset=clampF(el.value,0);
+      else if(f==='narrow'||f==='skip')r[f]=el.checked;
+      else r[f]=clampInt(el.value,0,255,0);
+      if(f==='dig'){ r.mode = (r.dig===0 && r.rx>=108 && r.rx<137)?1:0; }  // AM only for airband analog
+      if(f==='shiftdir'&&r.shiftdir===0)r.offset=0;
+      if(['rx','shiftdir','sql','dig','name'].includes(f)) render();
+    });
+  });
+  document.querySelectorAll('#view [data-del]').forEach(b=>b.addEventListener('click',()=>{
+    (tab==='pms'?pms:chans).splice(+b.dataset.del,1); render();}));
+  const add=document.getElementById('addCh');
+  if(add)add.addEventListener('click',()=>{ if(chans.length>=NCHAN)return toast('Maximum '+NCHAN+' channels reached');
+    chans.push(blank(145.5,'NEW'));render();});
+  const addP=document.getElementById('addPms');
+  if(addP)addP.addEventListener('click',()=>{ if(pms.length>NPMS-2)return toast('Maximum scan-edge pairs reached');
+    pms.push(blank(145.0,'LOW'));pms.push(blank(146.0,'HIGH'));render();});
+  document.querySelectorAll('#view [data-bank]').forEach(cb=>cb.addEventListener('change',()=>{
+    const b=+cb.dataset.bank, ci=+cb.dataset.ch;
+    if(cb.checked)banks[b].add(ci);else banks[b].delete(ci);
+    cb.closest('.bankcard').querySelector('.chip').textContent=banks[b].size;}));
+}
+function blank(mhz,name){
+  const a=new Uint8Array(32);
+  a[29]=0x0d;a[30]=0x80;a[31]=0x18;
+  const r={raw:a,rx:mhz,name,mode:0,dig:1,shiftdir:0,offset:0,sql:0,tone:12,dcs:0,dcsdim:0,
+    power:3,step:4,narrow:false,skip:false,note:''};
+  reencode(r); return r;
+}
+
+// ---- chrome ----
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');
+  clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2800);}
+document.getElementById('loadBtn').onclick=()=>document.getElementById('file').click();
+document.getElementById('drop').onclick=()=>document.getElementById('file').click();
+document.getElementById('file').onchange=e=>{const f=e.target.files[0];if(f)f.arrayBuffer().then(loadBuf).catch(()=>toast('Could not read that file'));};
+document.getElementById('saveBtn').onclick=()=>{try{exportFile();}catch(err){toast('Export failed: '+err.message);}};
+['dragover','dragleave','drop'].forEach(ev=>document.getElementById('drop').addEventListener(ev,e=>{
+  e.preventDefault();const d=document.getElementById('drop');
+  if(ev==='dragover')d.classList.add('over');else d.classList.remove('over');
+  if(ev==='drop'&&e.dataTransfer.files[0])e.dataTransfer.files[0].arrayBuffer().then(loadBuf).catch(()=>toast('Could not read that file'));}));
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');tab=b.dataset.tab;render();});
+document.getElementById('themeBtn').onclick=()=>{
+  const r=document.documentElement;
+  const dark=r.getAttribute('data-theme')==='dark';
+  r.setAttribute('data-theme',dark?'light':'dark');
+  try{localStorage.setItem('bc5d:theme',dark?'light':'dark');}catch(e){}};
+try{const t=localStorage.getItem('bc5d:theme'); if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}
+</script>
+</body>
+</html>
