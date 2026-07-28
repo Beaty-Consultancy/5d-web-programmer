@@ -84,7 +84,9 @@ td.center{text-align:center}
 .rowbtn:hover{color:var(--bad)}
 .bankgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
 .bankcard{border:1px solid var(--line);border-radius:11px;padding:12px 14px;background:var(--panel);box-shadow:var(--shadow)}
-.bankcard h3{margin:0 0 8px;font-size:14px;color:var(--head);display:flex;justify-content:space-between;align-items:center}
+.bankcard h3{margin:0 0 8px;font-size:14px;color:var(--head);display:flex;justify-content:space-between;align-items:center;gap:6px}
+.bankcard h3 input.bankname{flex:1;min-width:0;font-family:'Quicksand',sans-serif;font-weight:600;font-size:13px;text-transform:uppercase}
+.bankcard h3 .lk{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;cursor:pointer}
 .bankcard label{display:flex;gap:8px;align-items:center;padding:2px 0;cursor:pointer;font-size:12.5px}
 .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--panel);
   border:1px solid var(--line);border-radius:11px;padding:11px 20px;box-shadow:0 10px 34px #2e388930;
@@ -128,7 +130,8 @@ kbd{background:var(--panel2);border:1px solid var(--line);border-radius:5px;padd
     Everything is decoded, edited and written <b>locally in your browser</b> — no upload, no server,
     no Yaesu software. Export produces a radio-valid file (checksum recomputed); copy it back to the card,
     then on the radio: <em>MENU → SD CARD → 2 MEMORY CH → Read from SD</em>.</p>
-    <div class="drop" id="drop">Click to choose a MEMORY.dat, or drop it here</div>
+    <p style="font-size:12.5px">Open a full <code>FT5D/BACKUP/BACKUP.dat</code> instead to also edit <b>bank names</b> and (coming soon) APRS &amp; menu settings.</p>
+    <div class="drop" id="drop">Click to choose a MEMORY.dat or BACKUP.dat, or drop it here</div>
   </div>
   <div id="view" hidden></div>
 </main>
@@ -148,12 +151,20 @@ const SQL=["OFF","TONE","TSQL","DCS","REV TONE","JR","PR","PAGER","--","D CD","T
 const MODEB=["FM","AM","WFM","-"];      // byte1 bits6-7 analog modulation
 const DIGA=["Analog","AMS","DN","VW"];  // byte5 bits4-5
 const POWER=["L1 .3W","L2 1W","L3 2.5W","High 5W"];
-// region offsets in MEMORY.dat (SD_offset = ADMS_addr - 5440)
-const BANK0=0x0000, DIR0=0x12c0, REC0=0x1800, PMS0=0x9500, CKSUM=0xab19, RLEN=32;
-const NBANK=24, BSLOT=100, NCHAN=900, NPMS=100, MAXFILE=0x30000;
+// Two file kinds. MEMORY.dat = channels only (window at ADMS_addr-5440).
+// BACKUP.dat = full radio clone (native addresses), adds bank names + deep config.
+const RLEN=32, NBANK=24, BSLOT=100, NCHAN=900, NPMS=100, MAXFILE=0x30000;
+const FMT={
+  44160 :{bank:0x0000,dir:0x12c0,rec:0x1800,pms:0x9500,cksum:0xab19,cklen:3,backup:false},
+  130496:{bank:5440,dir:10240,rec:11584,pms:43584,cksum:130492,cklen:4,backup:true,
+          bankName:3828,bankLink:1340},
+};
+let BANK0,DIR0,REC0,PMS0,CKSUM,CKLEN,BANKNAME0,BANKLINK0,isBackup;
+function setFormat(f){BANK0=f.bank;DIR0=f.dir;REC0=f.rec;PMS0=f.pms;CKSUM=f.cksum;
+  CKLEN=f.cklen;isBackup=f.backup;BANKNAME0=f.bankName;BANKLINK0=f.bankLink;}
 
 let u8=null;                     // full file bytes (preserved except edited regions)
-let chans=[], pms=[], banks=[];  // banks[b] = Set of 0-based channel indices
+let chans=[], pms=[], banks=[], bankNames=[], bankLinks=[];
 
 // ---- byte helpers ----
 const clampF=(x,fb)=>{const n=parseFloat(x);return Number.isFinite(n)?n:fb;};
@@ -196,8 +207,9 @@ function reencode(r){
 }
 
 function loadBuf(ab){
-  if(ab.byteLength<CKSUM+3){toast('That does not look like an FT-5D MEMORY.dat');return;}
-  if(ab.byteLength>MAXFILE){toast('File too large to be a MEMORY.dat');return;}
+  const f=FMT[ab.byteLength];
+  if(!f){toast('Unrecognised file — open a MEMORY.dat (44 KB) or a full BACKUP.dat (130 KB)');return;}
+  setFormat(f);
   u8=new Uint8Array(ab);
   chans=[]; const slotToIdx=Object.create(null);
   for(let i=0;i<NCHAN;i++){ if(u8[DIR0+i]&1){ const r=decodeRec(REC0+i*RLEN);
@@ -208,6 +220,10 @@ function loadBuf(ab){
   banks=[]; for(let b=0;b<NBANK;b++){ const s=new Set(); const base=BANK0+b*BSLOT*2;
     for(let k=0;k<BSLOT;k++){ const v=(u8[base+k*2]<<8)|u8[base+k*2+1]; if(v===0xffff)continue;
       const idx=v&0x7ff; if((v>>11)===0 && idx in slotToIdx) s.add(slotToIdx[idx]); } banks.push(s); }
+  bankNames=[]; bankLinks=[];
+  if(isBackup){ for(let b=0;b<NBANK;b++){
+    let nm='';for(let i=0;i<16;i++){const c=u8[BANKNAME0+b*18+2+i];if(c===0xff||c===0)break;if(c>=32&&c<127)nm+=String.fromCharCode(c);}
+    bankNames.push(nm.trim()); bankLinks.push(((u8[BANKLINK0+(b>>3)]>>(b&7))&1)?true:false); } }
   document.getElementById('empty').hidden=true;
   document.getElementById('view').hidden=false;
   document.getElementById('tabs').hidden=false;
@@ -229,13 +245,24 @@ function exportFile(){
     for(let k=0;k<BSLOT*2;k++)out[base+k]=0xff;
     let k=0; banks[b].forEach(ci=>{ if(k<BSLOT && ci>=0 && ci<chans.length){ const v=(ci&0x7ff);
       out[base+k*2]=(v>>8)&0xff; out[base+k*2+1]=v&0xff; k++; } }); }
-  let ck=0; for(let i=0;i<CKSUM;i++)ck=(ck+out[i])&0xffffff;
-  out[CKSUM]=(ck>>16)&0xff; out[CKSUM+1]=(ck>>8)&0xff; out[CKSUM+2]=ck&0xff;
+  if(isBackup){
+    for(let b=0;b<NBANK;b++){
+      const nm=(bankNames[b]||'').slice(0,16), o=BANKNAME0+b*18;
+      out[o]=0; out[o+1]=0;                                  // name-width 0 (ASCII)
+      for(let i=0;i<16;i++){const c=nm.charCodeAt(i);out[o+2+i]=(i<nm.length&&c>=32&&c<127)?c:0xff;}
+      const lo=BANKLINK0+(b>>3), bit=1<<(b&7);               // link off if bank is empty
+      out[lo]=(out[lo]&~bit)|((bankLinks[b]&&banks[b].size>0)?bit:0);
+    }
+  }
+  let ck=0; for(let i=0;i<CKSUM;i++)ck=(ck+out[i])>>>0;      // 3-byte (MEMORY) or 4-byte (BACKUP) BE
+  for(let k=0;k<CKLEN;k++)out[CKSUM+k]=(ck>>>(8*(CKLEN-1-k)))&0xff;
+  const fn=isBackup?'BACKUP.dat':'MEMORY.dat';
   const blob=new Blob([out],{type:'application/octet-stream'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-  a.download='MEMORY.dat'; document.body.appendChild(a); a.click(); a.remove();
+  a.download=fn; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(a.href),1500);
-  toast('Exported MEMORY.dat — copy to FT5D_MEMORY-CH/ on the card');
+  toast(isBackup?'Exported BACKUP.dat — copy to FT5D/BACKUP/, then SD → Backup → Read (full restore)'
+                :'Exported MEMORY.dat — copy to FT5D_MEMORY-CH/ on the card');
 }
 
 // ---- app-only per-channel notes (localStorage; NOT written to the radio) ----
@@ -326,14 +353,19 @@ function renderPms(){
 }
 function renderBanks(){
   const cards=banks.map((s,b)=>'<div class="bankcard">'+
-    '<h3><span>Bank '+(b+1)+'</span><span class="chip">'+s.size+'</span></h3>'+
+    '<h3>'+(isBackup
+      ? '<input class="bankname" data-bankname="'+b+'" maxlength="16" value="'+esc(bankNames[b]||'')+'" placeholder="Bank '+(b+1)+'">'
+        +'<label class="lk" title="Include this bank in bank-link scan"><input type="checkbox" data-banklink="'+b+'"'+(bankLinks[b]?' checked':'')+'>link</label>'
+      : '<span>Bank '+(b+1)+'</span>')
+      +'<span class="chip">'+s.size+'</span></h3>'+
     '<div style="max-height:210px;overflow:auto">'+
     chans.map((c,i)=>'<label title="'+esc(c.rx.toFixed(4)+' MHz')+'"><input type="checkbox" data-bank="'+b+'" data-ch="'+i+'"'+(s.has(i)?' checked':'')+'>'+
       '<span class="idx">'+(i+1)+'</span> '+esc(c.name||'(unnamed)')+' <span class="chip">'+esc(c.rx.toFixed(3))+'</span></label>').join('')+
     '</div></div>').join('');
-  return '<div class="hint">24 scan banks. A channel can belong to <b>several</b> banks — tick it wherever you want it. '+
-    'On the radio, select a bank to scan only those channels. <b>Bank names</b> live in the radio’s full backup (not MEMORY.dat), so here banks are numbered.</div>'+
-    '<div class="bankgrid">'+cards+'</div>';
+  const hint=isBackup
+    ? '24 scan banks. <b>Name</b> each one, tick channels in, and toggle <b>link</b> to include a bank in a linked bank-scan. Names save into the backup file.'
+    : '24 scan banks. A channel can belong to <b>several</b> banks — tick it wherever you want it. <b>Bank names</b> live in the full backup, so open a <b>BACKUP.dat</b> to name them.';
+  return '<div class="hint">'+hint+'</div><div class="bankgrid">'+cards+'</div>';
 }
 
 function wire(){
@@ -364,6 +396,10 @@ function wire(){
     const b=+cb.dataset.bank, ci=+cb.dataset.ch;
     if(cb.checked)banks[b].add(ci);else banks[b].delete(ci);
     cb.closest('.bankcard').querySelector('.chip').textContent=banks[b].size;}));
+  document.querySelectorAll('#view [data-bankname]').forEach(el=>el.addEventListener('change',()=>{
+    bankNames[+el.dataset.bankname]=el.value.toUpperCase().slice(0,16);}));
+  document.querySelectorAll('#view [data-banklink]').forEach(el=>el.addEventListener('change',()=>{
+    bankLinks[+el.dataset.banklink]=el.checked;}));
 }
 function blank(mhz,name){
   const a=new Uint8Array(32);
