@@ -1,8 +1,8 @@
 # Yaesu FT-5D `MEMORY.dat` format
 
-Reverse-engineered documentation of the SD-card memory-channel file
+Documentation of the SD-card memory-channel file
 (`FT5D_MEMORY-CH/MEMORY.dat`) written by the Yaesu FT-5DE / FT-5DR. Verified
-byte-for-byte against radio-authored files. This describes an interoperable file
+byte-for-byte against the radio's own files. This describes an interoperable file
 format for interoperability purposes; it contains no vendor software.
 
 The file is **44,160 bytes** (`0xAC80`). All multi-byte integers noted below are

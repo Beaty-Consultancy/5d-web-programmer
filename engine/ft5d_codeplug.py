@@ -1,12 +1,10 @@
 """FT-5DE codeplug engine — encodes a radio-valid SD MEMORY.dat.
 
-Derived byte-for-byte from Yaesu ADMS-14's decompiled `Memory.Encode()` and
-validated against radio-authored records (GB3CA ch44, airband AM). Supersedes
-the earlier hand-reverse-engineered version, which mis-placed the shift bits
-(byte1 bit1 instead of bits4-5) and wrote every repeater as simplex.
+Validated byte-for-byte against the radio's own records (e.g. GB3CA, airband AM),
+so exported files match what the radio itself produces for the same settings.
 
-MEMORY.dat is a window of the radio image at ADMS offset 5440, so
-SD_offset = ADMS_addr - 5440:
+MEMORY.dat is a window into the radio image at offset 5440
+(SD_offset = image_addr - 5440):
   0x0000  scan-bank membership  (24 banks x 100 slots x 2 bytes)
   0x12c0  channel directory     (1 byte/chan: bit0 present, bits2-3 skip)
   0x1800  memory channels        (900 x 32-byte records)
@@ -52,7 +50,7 @@ DCS_CODES = ["023","025","026","031","032","036","043","047","051","053","054",
     "624","627","631","632","654","662","664","703","712","723","731","732","734",
     "743","754"]
 
-# byte1 low-nibble step index -> kHz (full 11-entry ADMS tbl_Step)
+# byte1 low-nibble step index -> kHz (full 11-entry step table)
 STEP_KHZ = {5.0:0, 6.25:1, 8.33:2, 10.0:3, 12.5:4, 15.0:5, 20.0:6, 25.0:7,
             50.0:8, 100.0:9, 9.0:10}
 SQL = {"OFF":0, "TONE":1, "TSQL":2, "DCS":3, "REVTONE":4, "PR":6, "PAGER":7,
@@ -93,7 +91,7 @@ def record(mhz: float, tag: str, mode: str = "AMS", offset_mhz: float = 0.0,
            sql: str = "OFF", dcs_code=None, dcs_dim: str = "RXN_TXN",
            power: str = "HIGH", step_khz: float | None = None,
            narrow: bool = False) -> bytes:
-    """Build one 32-byte channel/PMS record (matches ADMS Memory.Encode)."""
+    """Build one 32-byte channel/PMS record (matches the radio's record layout)."""
     if mode not in DIG:
         raise ValueError(f"unknown mode {mode!r}; use one of {sorted(DIG)}")
     if sql not in SQL:

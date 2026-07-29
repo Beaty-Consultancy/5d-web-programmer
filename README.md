@@ -9,7 +9,7 @@ no cable, nothing leaves your device.
 
 _by [Beaty Consultancy](https://beatyconsultancy.co.uk) — friendly, affordable cloud consultancy_
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-06b3d7.svg)](LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-06b3d7.svg)](LICENSE)
 &nbsp;·&nbsp; Runs entirely in your browser &nbsp;·&nbsp; Works offline
 
 </div>
@@ -47,7 +47,7 @@ job from any browser, on any OS, for free.
 
 ![Editing bank names in full-backup mode](docs/screenshot-banks.png)
 - **Safe by construction** — the decoder/encoder is validated **byte-for-byte** against
-  Yaesu ADMS-14's own output, and the checksum is recomputed on export.
+  the radio's own output, and the checksum is recomputed on export.
 - **Zero dependencies, one file** — `index.html` is entirely self-contained.
 
 ## Use it
@@ -87,11 +87,11 @@ See [`engine/example.py`](engine/example.py) for a runnable end-to-end example.
 
 ## How it works
 
-The FT-5D `MEMORY.dat` layout was reverse-engineered and is documented in full at
+The FT-5D `MEMORY.dat` layout is documented in full at
 [`docs/FT5D-FORMAT.md`](docs/FT5D-FORMAT.md) — file regions, the 32-byte channel
 record, every value table, the scan-bank and PMS formats, and the checksum. The
-encoder in this tool is derived from and validated against that specification, so
-exported files are byte-identical to what the radio itself produces for the same
+encoder is validated against that specification and against the radio's own files,
+so exported files are byte-identical to what the radio itself produces for the same
 settings.
 
 ## Roadmap
@@ -108,12 +108,12 @@ the radio's menu settings — those live in the separate full-backup file, not `
 
 ## Disclaimer
 
-Not affiliated with, endorsed by, or connected to Yaesu / Yaesu Musen Co., Ltd. "Yaesu",
-"FT-5D" and "ADMS" are trademarks of their respective owners. This project reads and
-writes an interoperable file format for the purpose of interoperability; it contains no
-Yaesu software. Transmitting is your responsibility — only transmit where you are
-licensed and permitted to do so. Provided under the MIT License with **no warranty**;
-you are responsible for keeping backups of your data.
+Not affiliated with, endorsed by, or connected to Yaesu / Yaesu Musen Co., Ltd. "Yaesu"
+and "FT-5D" are trademarks of their respective owners. This project reads and writes an
+interoperable file format for the purpose of interoperability; it contains no Yaesu
+software. Transmitting is your responsibility — only transmit where you are licensed and
+permitted to do so. Provided under the Apache License 2.0 with **no warranty**; you are
+responsible for keeping backups of your data.
 
 ## Contributing
 
@@ -122,4 +122,4 @@ handled or doesn't round-trip, please open an issue with (a redacted) example.
 
 ## License
 
-[MIT](LICENSE) © Beaty Consultancy
+[Apache 2.0](LICENSE) © Beaty Consultancy Limited
