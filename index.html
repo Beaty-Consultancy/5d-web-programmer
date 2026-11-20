@@ -269,6 +269,9 @@ function exportFile(){
     out[DIR0+i]=0x03|((r.skip?1:0)<<2); if(r.note!=null)setNote(r,r.note); });
   for(let i=0;i<NPMS;i++)for(let j=0;j<RLEN;j++)out[PMS0+i*RLEN+j]=0xff;
   pms.slice(0,NPMS).forEach((r,i)=>{reencode(r);out.set(r.raw,PMS0+i*RLEN);});
+  // PMS present-array: 1 byte per edge slot, 1000 bytes after the channel directory.
+  // Without it a newly added pair shows on the radio as a blank, unnamed scan edge.
+  for(let i=0;i<NPMS;i++)out[DIR0+1000+i]=i<Math.min(pms.length,NPMS)?0x03:0x00;
   for(let b=0;b<NBANK;b++){const base=BANK0+b*BSLOT*2;
     for(let k=0;k<BSLOT*2;k++)out[base+k]=0xff;
     let k=0; banks[b].forEach(ci=>{ if(k<BSLOT && ci>=0 && ci<chans.length){ const v=(ci&0x7ff);

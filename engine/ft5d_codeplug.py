@@ -30,6 +30,7 @@ BANK0 = 0x0000
 DIR0 = 0x12c0
 REC0 = 0x1800
 PMS0 = 0x9500
+PMS_FLAG0 = 0x16a8        # PMS present-array: 1 byte per edge slot, 0x03=set
 CKSUM_OFF = 0xab19
 RECLEN = 32
 NUM_BANKS = 24
@@ -201,6 +202,10 @@ def build(base: bytes, channels: list[dict], pms: list[dict] | None = None,
     if pms:
         check_pms(pms)
         _write_block(b, PMS0, [dict(c) for c in pms], 100)
+        # PMS present-array (1 byte per edge slot): set written slots, clear the
+        # rest, or stale flags from the base file show as blank scan edges.
+        for i in range(100):
+            b[PMS_FLAG0 + i] = 0x03 if i < len(pms) else 0x00
     if banks:
         set_banks(b, banks)
     ck = sum(b[:CKSUM_OFF]) & 0xffffff
