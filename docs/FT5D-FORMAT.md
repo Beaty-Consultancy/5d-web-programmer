@@ -104,6 +104,12 @@ Programmable Memory Scan edges use the **same 32-byte record format** as channel
 in LO/HI pairs bounding a scan range. Set them to Analog or AMS so the radio stops
 on FM signals within the range.
 
+The radio only scans a pair when **both edges are in the same receiver band**, lower
+first and at least 100 kHz apart. Bands: 108–137, 137–174, 174–222, 222–420, 420–470
+and 470–770 MHz; a boundary frequency belongs to the band above. So 164–174 and
+440–470 do not scan: stop at 173.975 and 469.975. The app warns and the engine's
+`build()` raises on such a pair.
+
 ## Checksum (`0xAB19`)
 
 3 bytes, big-endian, equal to `sum(file[0 : 0xAB19]) & 0xFFFFFF`. Recompute and
