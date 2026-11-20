@@ -24,10 +24,13 @@ MEMORY.dat is a window into the radio image at offset 5440
 """
 from __future__ import annotations
 
+from bisect import bisect_right
+
 BANK0 = 0x0000
 DIR0 = 0x12c0
 REC0 = 0x1800
 PMS0 = 0x9500
+PMS_FLAG0 = 0x16a8        # PMS present-array: 1 byte per edge slot, 0x03=set
 CKSUM_OFF = 0xab19
 RECLEN = 32
 NUM_BANKS = 24
@@ -59,6 +62,28 @@ DIG = {"FM":0, "AM":0, "WFM":0, "AMS":1, "DN":2, "VW":3}   # DigAnalog (byte5 4-
 MODE = {"FM":0, "AM":1, "WFM":2, "AMS":0, "DN":0, "VW":0}  # analog Mode (byte1 6-7)
 POWER = {"L1":0, "L2":1, "L3":2, "HIGH":3}
 DCS_DIM = {"RXN_TXN":0, "RXI_TXN":1, "RXB_TXN":2, "RXN_TXI":3, "RXI_TXI":4, "RXB_TXI":5}
+
+
+# Receiver band boundaries in MHz (FT-5DE operating manual, "Frequency bands on
+# A-band", Europe version). The radio only runs a PMS scan when both edges are
+# in ONE band, and a boundary frequency belongs to the band ABOVE it: 174.000
+# and 470.000 as upper edges give a range the radio refuses to scan.
+BAND_EDGES = [1.8, 30, 88, 108, 137, 174, 222, 420, 470, 770]
+
+
+def check_pms(pms: list[dict]) -> None:
+    """Raise ValueError for any PMS pair the radio would refuse to scan
+    (same band, lower < upper, at least 100 kHz wide)."""
+    if len(pms) % 2:
+        raise ValueError("PMS edges must come in lower/upper pairs")
+    for lo, hi in zip(pms[::2], pms[1::2]):
+        l, h = lo["mhz"], hi["mhz"]
+        name = f"PMS {lo.get('tag', l)} {l:.4f} - {hi.get('tag', h)} {h:.4f}"
+        if h - l < 0.1 - 1e-9:
+            raise ValueError(f"{name}: upper edge must be at least 100 kHz above the lower")
+        if bisect_right(BAND_EDGES, l) != bisect_right(BAND_EDGES, h):
+            raise ValueError(f"{name}: edges are in different radio bands (boundaries "
+                             f"{BAND_EDGES} MHz belong to the band above), the radio will not scan it")
 
 
 def _magtype(mhz: float) -> int:
@@ -175,7 +200,12 @@ def build(base: bytes, channels: list[dict], pms: list[dict] | None = None,
         b[DIR0 + i] = 0x00
     _write_block(b, REC0, [dict(c) for c in channels], clear_slots)
     if pms:
+        check_pms(pms)
         _write_block(b, PMS0, [dict(c) for c in pms], 100)
+        # PMS present-array (1 byte per edge slot): set written slots, clear the
+        # rest, or stale flags from the base file show as blank scan edges.
+        for i in range(100):
+            b[PMS_FLAG0 + i] = 0x03 if i < len(pms) else 0x00
     if banks:
         set_banks(b, banks)
     ck = sum(b[:CKSUM_OFF]) & 0xffffff

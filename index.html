@@ -261,12 +261,17 @@ function loadBuf(ab){
 
 // ---- export ----
 function exportFile(){
+  const probs=pmsProblems();
+  if(probs.length && !confirm('These scan-edge pairs will NOT scan on the radio:\n\n'+probs.join('\n')+'\n\nSave anyway?')) return;
   const out=new Uint8Array(u8);                    // start from the loaded file (preserve everything)
   for(let i=0;i<NCHAN;i++){out[DIR0+i]=0;for(let j=0;j<RLEN;j++)out[REC0+i*RLEN+j]=0xff;}
   chans.slice(0,NCHAN).forEach((r,i)=>{ reencode(r); out.set(r.raw,REC0+i*RLEN);
     out[DIR0+i]=0x03|((r.skip?1:0)<<2); if(r.note!=null)setNote(r,r.note); });
   for(let i=0;i<NPMS;i++)for(let j=0;j<RLEN;j++)out[PMS0+i*RLEN+j]=0xff;
   pms.slice(0,NPMS).forEach((r,i)=>{reencode(r);out.set(r.raw,PMS0+i*RLEN);});
+  // PMS present-array: 1 byte per edge slot, 1000 bytes after the channel directory.
+  // Without it a newly added pair shows on the radio as a blank, unnamed scan edge.
+  for(let i=0;i<NPMS;i++)out[DIR0+1000+i]=i<Math.min(pms.length,NPMS)?0x03:0x00;
   for(let b=0;b<NBANK;b++){const base=BANK0+b*BSLOT*2;
     for(let k=0;k<BSLOT*2;k++)out[base+k]=0xff;
     let k=0; banks[b].forEach(ci=>{ if(k<BSLOT && ci>=0 && ci<chans.length){ const v=(ci&0x7ff);
@@ -428,7 +433,23 @@ function renderChannels(){
      '<th></th>'+
    '</tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
+// The radio only scans a PMS pair whose edges sit in ONE receiver band, lower first,
+// at least 100 kHz apart. A boundary frequency belongs to the band above it, so an
+// upper edge of exactly 174.000 or 470.000 gives a range the radio refuses to scan.
+const BAND_EDGES=[1.8,30,88,108,137,174,222,420,470,770];
+const bandOf=mhz=>BAND_EDGES.filter(e=>mhz>=e).length;
+function pmsProblems(){
+  const out=[];
+  for(let i=0;i+1<pms.length;i+=2){ const lo=pms[i].rx, hi=pms[i+1].rx, n='Pair '+(i/2+1)+' ('+lo.toFixed(4)+' – '+hi.toFixed(4)+' MHz)';
+    if(hi-lo<0.1-1e-9) out.push(n+': HI must be at least 100 kHz above LO');
+    else if(bandOf(lo)!==bandOf(hi)){ const e=BAND_EDGES[bandOf(lo)];
+      out.push(n+': crosses the radio band boundary at '+e+' MHz, so the radio will not scan it'+
+        (hi===e?' — set HI just below '+e+' MHz':' — split it into one pair per band')); } }
+  if(pms.length%2) out.push('The last edge has no partner — edges work in LO/HI pairs');
+  return out;
+}
 function renderPms(){
+  const probs=pmsProblems();
   const rows=pms.map((r,i)=>'<tr data-i="'+i+'" data-pms="1">'+
     '<td class="idx">'+((i%2)?'HI':'LO')+' '+(Math.floor(i/2)+1)+'</td>'+
     '<td><input class="freq" data-f="rx" value="'+esc(r.rx.toFixed(4))+'"></td>'+
@@ -439,7 +460,9 @@ function renderPms(){
     '<td class="center"><input type="checkbox" data-f="narrow"'+(r.narrow?' checked':'')+'></td>'+
     '<td class="center"><button class="rowbtn" data-del="'+i+'" title="Delete this edge">✕</button></td></tr>').join('');
   return '<div class="hint">Programmable Memory Scan edges — each <b>LO/HI</b> pair bounds a frequency range the radio sweeps. '+
-    'Set the <b>Mode</b> to <b>Analog</b> or <b>AMS</b> (not DN) so it stops on FM signals; PMR446 is analog FM, narrow.</div>'+
+    'Set the <b>Mode</b> to <b>Analog</b> or <b>AMS</b> (not DN) so it stops on FM signals; PMR446 is analog FM, narrow. '+
+    'Both edges must be in the same radio band (boundaries at '+BAND_EDGES.join(', ')+' MHz).</div>'+
+   (probs.length?'<div class="hint" style="color:#e6257a"><b style="color:inherit">Will not scan:</b><br>'+probs.map(esc).join('<br>')+'</div>':'')+
    '<div class="summary"><div class="stat act"><button id="addPms">+ Add edge pair</button></div>'+
      '<div class="stat"><b>'+Math.floor(pms.length/2)+'</b><span>edge pairs</span></div></div>'+
    '<div class="tablewrap"><table><thead><tr>'+
